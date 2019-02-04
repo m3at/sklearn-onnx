@@ -81,6 +81,7 @@ from sklearn.preprocessing import FunctionTransformer
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer, TfidfTransformer
 from sklearn.feature_selection import GenericUnivariateSelect, RFE, RFECV, SelectFdr, SelectFpr, SelectFromModel
 from sklearn.feature_selection import SelectFwe, SelectKBest, SelectPercentile, VarianceThreshold
+from sklearn.feature_extraction import FeatureHasher
 from sklearn.impute import SimpleImputer
 
 # In most cases, scikit-learn operator produces only one output. However, each classifier has basically two outputs;
@@ -111,7 +112,7 @@ def build_sklearn_operator_name_map():
                     CountVectorizer, TfidfVectorizer, TfidfTransformer,
                     GenericUnivariateSelect, RFE, RFECV, SelectFdr, SelectFpr, SelectFromModel,
                     SelectFwe, SelectKBest, SelectPercentile, VarianceThreshold,
-                    FunctionTransformer]}
+                    FunctionTransformer, FeatureHasher]}
     res.update({
         ElasticNet: 'SklearnElasticNetRegressor',
         LinearRegression: 'SklearnLinearRegressor',

@@ -11,6 +11,7 @@ from . import CalibratedClassifierCV
 from . import Concat
 from . import DictVectorizer
 from . import DecisionTree
+from . import FeatureHasher
 from . import FeatureSelection 
 from . import FunctionTransformer
 from . import GradientBoosting
