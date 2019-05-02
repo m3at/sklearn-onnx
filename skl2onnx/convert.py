@@ -7,17 +7,18 @@
 from uuid import uuid4
 from .proto import get_opset_number_from_onnx
 from .common._topology import convert_topology
-from ._parse import parse_sklearn
+from ._parse import parse_sklearn_model
 
 # Invoke the registration of all our converters and shape calculators.
-from . import shape_calculators
-from . import operator_converters
+from . import shape_calculators # noqa
+from . import operator_converters # noqa
 
 
 def convert_sklearn(model, name=None, initial_types=None, doc_string='',
                     target_opset=None, custom_conversion_functions=None,
-                    custom_shape_calculators=None):
-    '''
+                    custom_shape_calculators=None,
+                    custom_parsers=None, options=None):
+    """
     This function produces an equivalent ONNX model of the given scikit-learn model.
     The supported converters is returned by function
     :func:`supported_converters <skl2onnx.supported_converters>`.
@@ -29,16 +30,19 @@ def convert_sklearn(model, name=None, initial_types=None, doc_string='',
     *ONNX* model name can also be specified.
 
     :param model: A scikit-learn model
-    :param initial_types: a python list. Each element is a tuple of a variable name 
+    :param initial_types: a python list. Each element is a tuple of a variable name
         and a type defined in data_types.py
     :param name: The name of the graph (type: GraphProto) in the produced ONNX model (type: ModelProto)
     :param doc_string: A string attached onto the produced ONNX model
     :param target_opset: number, for example, 7 for ONNX 1.2, and 8 for ONNX 1.3.
-    :param targeted_onnx: A string (for example, '1.1.2' and '1.2') used to specify 
-        the targeted ONNX version of the produced model. If ONNXMLTools cannot find 
-        a compatible ONNX python package, an error may be thrown.
-    :param custom_conversion_functions: a dictionary for specifying the user customized conversion function
+    :param custom_conversion_functions: a dictionary for specifying the user customized conversion function,
+        it takes precedence over registered converters
     :param custom_shape_calculators: a dictionary for specifying the user customized shape calculator
+        it takes precedence over registered shape calculators.
+    :param custom_parsers: parsers determines which outputs is expected for which particular task,
+        default parsers are defined for classifiers, regressors, pipeline but they can be rewritten,
+        *custom_parsers* is a dictionary ``{ type: fct_parser(scope, model, inputs, custom_parsers=None) }``
+    :param options: specific options given to converters (see :ref:`l-conv-options`)
     :return: An ONNX model (type: ModelProto) which is equivalent to the input scikit-learn model
 
     Example of initial_types:
@@ -54,28 +58,69 @@ def convert_sklearn(model, name=None, initial_types=None, doc_string='',
                         ('int64_input', Int64TensorType([1, 10]))]
 
     .. note::
-        
-        If a pipeline includes an instance of 
+
+        If a pipeline includes an instance of
         `ColumnTransformer <https://scikit-learn.org/stable/modules/generated/sklearn.compose.ColumnTransformer.html>`_,
         *scikit-learn* allow the user to specify columns by names. This option is not supported
         by *sklearn-onnx* as features names could be different in input data and the ONNX graph
         (defined by parameter *initial_types*), only integers are supported.
-    '''
+
+    .. _l-conv-options:
+
+    Converters options
+    ++++++++++++++++++
+
+    Some ONNX operators exposes parameters *sklearn-onnx* cannot
+    guess from the raw model. Some default values are usually suggested
+    but the users may have to manually overwrite them. This need
+    is not obvious to do when a model is included in a pipeline.
+    That's why these options can be given to function *convert_sklearn*
+    as a dictionary ``{model_type: parameters in a dictionary}`` or
+    ``{model_id: parameters in a dictionary}``.
+    Option *sep* is used to specify the delimiters between two words
+    when the ONNX graph needs to tokenize a string.
+    The default value is short and may not include all
+    the necessary values. It can be overwritten as:
+
+    ::
+
+        extra = {TfidfVectorizer: {"sep": [' ', '.', '?', ',', ';', ':', '!', '(', ')']}}
+        model_onnx = convert_sklearn(model, "tfidf",
+                                     initial_types=[("input", StringTensorType([1, 1]))],
+                                     options=extra)
+
+    But if a pipeline contains two model of the same class,
+    it is possible to disintguish between the two with function *id*:
+
+    ::
+
+        extra = {id(model): {"sep": [' ', '.', '?', ',', ';', ':', '!', '(', ')']}}
+        model_onnx = convert_sklearn(pipeline, "pipeline-with-2-tfidf",
+                                     initial_types=[("input", StringTensorType([1, 1]))],
+                                     options=extra)
+
+    It used in example :ref:`l-example-tfidfvectorizer`.
+    """ # noqa
     if initial_types is None:
-        raise ValueError('Initial types are required. See usage of convert(...) in \
-                           skl2onnx.convert for details')
+        raise ValueError('Initial types are required. See usage of '
+                         'convert(...) in skl2onnx.convert for details')
 
     if name is None:
         name = str(uuid4().hex)
 
-    target_opset = target_opset if target_opset else get_opset_number_from_onnx()
-    # Parse scikit-learn model as our internal data structure (i.e., Topology)
-    topology = parse_sklearn(model, initial_types, target_opset, custom_conversion_functions, custom_shape_calculators)
+    target_opset = (target_opset
+                    if target_opset else get_opset_number_from_onnx())
+    # Parse scikit-learn model as our internal data structure
+    # (i.e., Topology)
+    topology = parse_sklearn_model(model, initial_types, target_opset,
+                                   custom_conversion_functions,
+                                   custom_shape_calculators, custom_parsers)
 
     # Infer variable shapes
     topology.compile()
 
     # Convert our Topology object into ONNX. The outcome is an ONNX model.
-    onnx_model = convert_topology(topology, name, doc_string, target_opset)
+    onnx_model = convert_topology(topology, name, doc_string, target_opset,
+                                  options=options)
 
     return onnx_model
