@@ -62,6 +62,7 @@ from sklearn.cluster import KMeans, MiniBatchKMeans
 from sklearn.decomposition import PCA
 from sklearn.decomposition import TruncatedSVD
 from sklearn.feature_extraction import DictVectorizer
+from sklearn.feature_extraction import FeatureHasher
 from sklearn.feature_extraction.text import CountVectorizer, TfidfTransformer
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.feature_selection import GenericUnivariateSelect, RFE, RFECV
@@ -138,7 +139,7 @@ def build_sklearn_operator_name_map():
                 RobustScaler, OneHotEncoder, DictVectorizer,
                 GenericUnivariateSelect, RFE, RFECV, SelectFdr, SelectFpr,
                 SelectFromModel, SelectFwe, SelectKBest, SelectPercentile,
-                VarianceThreshold,
+                VarianceThreshold, FeatureHasher,
     ] if k is not None}
     res.update({
         ElasticNet: 'SklearnElasticNetRegressor',

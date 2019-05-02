@@ -28,10 +28,10 @@ class TestSklearnFeatureHasher(unittest.TestCase):
         raw_data = ["one two", "three four", "one three", "two four"]
         hasher = FeatureHasher(n_features=2**3, input_type='string', dtype=numpy.float32)
         X = hasher.transform(raw_data)
-        model = convert_sklearn(hasher, initial_types=[('input', StringTensorType([1, 1]))])
+        model_onnx = convert_sklearn(hasher, initial_types=[('input', StringTensorType([1, 1]))])
         
         dump_data_and_model(numpy.array([[1, 1]], dtype=numpy.float32),
-                            model, model_onnx, basename="SklearnBinarizer-SkipDim1")
+                            hasher, model_onnx, basename="SklearnBinarizer-SkipDim1")
 
 
 if __name__ == "__main__":
