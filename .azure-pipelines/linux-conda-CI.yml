@@ -2,20 +2,6 @@
 # Create and test a Python package on multiple Python versions.
 # Add steps that analyze code, save the dist with the build record, publish to a PyPI-compatible index, and more:
 # https://docs.microsoft.com/azure/devops/pipelines/languages/python
-# Python 3.7 test was disabled.
-#      Py37-SklGit:
-#        python.version: '3.7'
-#        onnx.version: 'git'
-#        onnxrt.version: '==0.3.0'
-#        numpy.version: '==1.16.2'
-#        sklearn.version: 'git'
-#      Py37-Skl0192:
-#        python.version: '3.7'
-#        onnx.version: 'git'
-#        onnxrt.version: '==0.3.0'
-#        numpy.version: '==1.16.2'
-#        sklearn.version: '==0.19.2'
-
 
 trigger:
 - master
@@ -27,33 +13,69 @@ jobs:
     vmImage: 'Ubuntu-16.04'
   strategy:
     matrix:
-      Py37-OnnxGit:
+      Py37-Onnx160-Rt111-Skl022:
+        do.bench: '0'
         python.version: '3.7'
-        numpy.version: '==1.16.2'
-        onnx.version: 'git'
-        onnxrt.version: '==0.2.1'
+        numpy.version: '==1.18.1'
+        onnx.version: '==1.6.0'
+        onnxrt.version: '==1.1.1'
+        sklearn.version: '==0.22.1'
+        run.example: '1'
+      Py37-Onnx160-Rt100-Skl021:
+        do.bench: '0'
+        python.version: '3.7'
+        numpy.version: '==1.18.1'
+        onnx.version: '==1.6.0'
+        onnxrt.version: '==1.0.0'
+        sklearn.version: '==0.21.3'
+        run.example: '0'
+      Py37-Onnx150-Rt050-Skl021:
+        do.bench: '0'
+        python.version: '3.7'
+        numpy.version: '==1.17.4'
+        onnx.version: '==1.5.0'
+        onnxrt.version: '==0.5.0'
+        sklearn.version: '==0.21.3'
+        run.example: '0'
+      Py37-Onnx150-Rt040-Skl020:
+        do.bench: '0'
+        python.version: '3.7'
+        numpy.version: '==1.17.4'
+        onnx.version: '==1.5.0'
+        onnxrt.version: '==0.4.0'
         sklearn.version: '==0.20.3'
-      Py36-Onnx141:
+        run.example: '0'
+      Py36-Onnx141-Rt030-Skl020:
+        do.bench: '0'
         python.version: '3.6'
-        numpy.version: '==1.16.2'
+        numpy.version: '==1.16.5'
         onnx.version: '==1.4.1'
         onnxrt.version: '==0.3.0'
         sklearn.version: '==0.20.3'
-      Py36-Onnx130:
+        run.example: '0'
+      Py36-Onnx130-Rt021-Skl020:
+        do.bench: '0'
         python.version: '3.6'
-        numpy.version: '==1.16.2'
+        numpy.version: '==1.16.5'
         onnx.version: '==1.3.0'
         onnxrt.version: '==0.2.1'
         sklearn.version: '==0.20.3'
-      Py35-OnnxGit:
+        run.example: '0'
+      Py35-Onnx150-Rt021-Skl019:
+        do.bench: '0'
         python.version: '3.5'
-        numpy.version: '==1.16.2'
-        onnx.version: 'git'
+        numpy.version: '<=1.16.5'
+        onnx.version: '==1.5.0'
         onnxrt.version: '==0.2.1'
-        sklearn.version: '==0.20.3'
+        sklearn.version: '==0.19.2'
+        run.example: '0'
     maxParallel: 3
 
   steps:
+  - script: |
+      sudo install -d -m 0777 /home/vsts/.conda/envs
+    displayName: Fix Conda permissions
+
   - task: CondaEnvironment@1
     inputs:
       createCustomEnvironment: true
@@ -63,13 +85,13 @@ jobs:
   - script: |
       test '$(python.version)' == '3.7' && apt-get install protobuf-compiler libprotoc-dev
       conda config --set always_yes yes --set changeps1 no
-      conda install -c conda-forge numpy$(numpy.version)
+      conda install -c conda-forge "numpy$(numpy.version)"
       conda install protobuf
       python -m pip install --upgrade pip
     displayName: 'Install environment'
 
   - script: |
-      pip install numpy$(numpy.version)
+      conda install "numpy$(numpy.version)"
     displayName: 'install numpy'
 
   - script: |
@@ -100,15 +122,15 @@ jobs:
     displayName: 'install flake8'
 
   - script: |
-      flake8 skl2onnx tests
-    displayName: 'flake8'
-
-  - script: |
       pip install onnxruntime$(onnxrt.version)
     displayName: 'install onnxruntime'
 
   - script: |
       pip install -r requirements.txt
+      git clone https://github.com/microsoft/onnxconverter-common
+      cd onnxconverter-common
+      pip install -e .
+      cd ..
       pip install -r requirements-dev.txt
       pip install pytest
     displayName: 'install requirements'
@@ -132,18 +154,45 @@ jobs:
     displayName: 'version'
 
   - script: |
-      pytest tests --basetemp=temp --doctest-modules --junitxml=junit/test-results.xml
+      pytest tests --durations=0 --basetemp=temp --doctest-modules --junitxml=junit/test-results.xml
     displayName: 'pytest'
 
   - script: |
-      pip install onnxmltools openpyxl
-      coverage run --include=skl2onnx/** tests/benchmark.py
-      coverage report -m
-      coverage html
+      conda install -c conda-forge lightgbm xgboost --no-deps
+      pip install onnxmltools --no-deps
+    displayName: 'install onnxmltools'
+
+  - script: |
+      pip install matplotlib pydot
+    displayName: 'install modules for examples'
+    condition: eq(variables['run.example'], '1')
+
+  # Check flake8 after the tests to get more feedback.
+  # It is checked before the tests on the windows build.
+  - script: |
+      flake8 skl2onnx tests tests_onnxmltools
+    displayName: 'flake8'
+
+  - script: |
+      if [ '$(do.bench)' == '1' ]
+        then
+          pip install openpyxl
+          coverage run --include=skl2onnx/** tests/benchmark.py
+          coverage report -m
+          coverage html
+      fi
     displayName: 'coverage'
 
   - script: |
-      python tests/benchmark.py
+      pytest docs/tests --durations=0 --basetemp=temp --doctest-modules
+    displayName: 'run documentation examples'
+    condition: eq(variables['run.example'], '1')
+
+  - script: |
+      if [ '$(do.bench)' == '1' ]
+        then
+          python tests/benchmark.py
+      fi
     displayName: 'benchmark'
 
   - task: PublishTestResults@2

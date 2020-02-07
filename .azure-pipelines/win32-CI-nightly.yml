@@ -13,66 +13,86 @@ jobs:
     vmImage: 'vs2017-win2016'
   strategy:
     matrix:
-      Py36-Onnx141-nightlyRT-Npy1154:
-        python.version: '3.6.7'
-        onnx.version: 'onnx==1.4.1'
-        numpy.version: 'numpy==1.16.2'
+      Py37-Onnx160-nightlyRT-Npy1180-Sk0221:
+        python.version: '3.7'
+        onnx.version: 'onnx==1.6.0'
+        numpy.version: 'numpy==1.18.0'
         scipy.version: 'scipy'
         onnxrt.version: '-i https://test.pypi.org/simple/ ort-nightly'
+        sklearn.version: '==0.22.1'
+      Py37-Onnx150-nightlyRT-Npy1180-Sk0213:
+        python.version: '3.7'
+        onnx.version: 'onnx==1.5.0'
+        numpy.version: 'numpy==1.18.0'
+        scipy.version: 'scipy'
+        onnxrt.version: '-i https://test.pypi.org/simple/ ort-nightly'
+        sklearn.version: '==0.21.3'
     maxParallel: 3
 
   steps:
-  - task: CondaEnvironment@1
+  - task: UsePythonVersion@0
     inputs:
-      createCustomEnvironment: false
-      packageSpecs: 'python=$(python.version)'
+      versionSpec: '$(python.version)'
+      architecture: 'x64'
+
+  - powershell: Write-Host "##vso[task.prependpath]$env:CONDA\Scripts"
+    displayName: Add conda to PATH
+
+  - script: conda create --yes --quiet --name py$(python.version) -c conda-forge python=$(python.version) protobuf
+    displayName: Create Anaconda environment
 
   - script: |
-      conda install -y -c anaconda scikit-learn
-    displayName: 'Install numpy mkl scipy pandas sklearn'
-
-  - script: |
-      conda install -y -c conda-forge protobuf
+      call activate py$(python.version)
       python -m pip install --upgrade pip
       pip install $(numpy.version)
-      pip install $(scipy.version)
+      conda install $(scipy.version)
       pip install $(onnx.version)
+      pip install openpyxl
     displayName: 'Install numpy, scipy, onnx'
 
   - script: |
+      call activate py$(python.version)
       pip install -r requirements.txt
+      git clone https://github.com/microsoft/onnxconverter-common
+      cd onnxconverter-common
+      pip install -e .
+      cd ..
       pip install -r requirements-dev.txt
       pip install pytest
     displayName: 'install requirements'
 
   - script: |
+      call activate py$(python.version)
       pip install $(onnxrt.version)
     displayName: 'install onnxruntime'
 
   - script: |
+      pip install scikit-learn$(sklearn.version)
+    displayName: 'install scikit-learn'
+
+  - script: |
+      call activate py$(python.version)
       pip install -e .
     displayName: 'install skl2onnx'
 
   - script: |
+      call activate py$(python.version)
       python -c "import numpy;print('numpy:',numpy.__version__)"
       python -c "import scipy;print('scipy:',scipy.__version__)"
+      python -c "import sklearn;print('sklearn:',sklearn.__version__)"
       python -c "import onnx;print('onnx:',onnx.__version__)"
       python -c "import onnxconverter_common;print('onnxconverter-common:',onnxconverter_common.__version__)"
       python -c "import onnxruntime;print('onnxruntime:',onnxruntime.__version__)"
     displayName: 'version'
 
   - script: |
-      pytest tests --basetemp=temp --doctest-modules --junitxml=junit/test-results.xml
+      call activate py$(python.version)
+      pytest tests --durations=0 --basetemp=temp --doctest-modules --junitxml=junit/test-results.xml
     displayName: 'pytest'
 
   - script: |
-      pip install onnxmltools openpyxl
-      coverage run --include=skl2onnx/** tests/benchmark.py
-      coverage report -m
-      coverage html
-    displayName: 'coverage'
-
-  - script: |
+      call activate py$(python.version)
+      python -m pip install openpyxl
       python tests/benchmark.py
     displayName: 'benchmark'
 

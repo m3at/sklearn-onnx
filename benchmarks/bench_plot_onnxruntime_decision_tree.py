@@ -17,7 +17,12 @@ from numpy.testing import assert_almost_equal
 import matplotlib.pyplot as plt
 import pandas
 from sklearn.tree import DecisionTreeClassifier
-from sklearn.utils.testing import ignore_warnings
+try:
+    # scikit-learn >= 0.22
+    from sklearn.utils._testing import ignore_warnings
+except ImportError:
+    # scikit-learn < 0.22
+    from sklearn.utils.testing import ignore_warnings
 from skl2onnx import convert_sklearn
 from skl2onnx.common.data_types import FloatTensorType
 from onnxruntime import InferenceSession
@@ -32,7 +37,7 @@ def fcts_model(X, y, max_depth):
     rf = DecisionTreeClassifier(max_depth=max_depth)
     rf.fit(X, y)
 
-    initial_types = [('X', FloatTensorType([1, X.shape[1]]))]
+    initial_types = [('X', FloatTensorType([None, X.shape[1]]))]
     onx = convert_sklearn(rf, initial_types=initial_types)
     f = BytesIO()
     f.write(onx.SerializeToString())

@@ -24,6 +24,14 @@ class OnnxRuntimeAssertionError(AssertionError):
     pass
 
 
+class OnnxRuntimeMissingNewOnnxOperatorException(OnnxRuntimeAssertionError):
+    """
+    Raised when onnxruntime does not implement a new operator
+    defined in the latest onnx.
+    """
+    pass
+
+
 def evaluate_condition(backend, condition):
     """
     Evaluates a condition such as
@@ -35,12 +43,15 @@ def evaluate_condition(backend, condition):
         return eval(condition)
     else:
         raise NotImplementedError(
-            "Not implemented for backend '{0}'".format(backend))
+            "Not implemented for backend '{0}' and "
+            "condition '{1}'.".format(backend, condition))
 
 
 def is_backend_enabled(backend):
     """
     Tells if a backend is enabled.
+    Raises an exception if backend != 'onnxruntime'.
+    Unit tests only test models against this backend.
     """
     if backend == "onnxruntime":
         try:
@@ -59,7 +70,9 @@ def compare_backend(backend,
                     options=None,
                     verbose=False,
                     context=None,
-                    comparable_outputs=None):
+                    comparable_outputs=None,
+                    intermediate_steps=False,
+                    classes=None):
     """
     The function compares the expected output (computed with
     the model before being converted to ONNX) and the ONNX output
@@ -77,6 +90,9 @@ def compare_backend(backend,
     :param comparable_outputs: compare only these outputs
     :param verbose: in case of error, the function may print
         more information on the standard output
+    :param intermediate_steps: displays intermediate steps
+        in case of an error
+    :param classes: classes names (if option 'nocl' is used)
 
     The function does not return anything but raises an error
     if the comparison failed.
@@ -91,7 +107,9 @@ def compare_backend(backend,
                                decimal,
                                options=options,
                                verbose=verbose,
-                               comparable_outputs=comparable_outputs)
+                               comparable_outputs=comparable_outputs,
+                               intermediate_steps=intermediate_steps,
+                               classes=classes)
     else:
         raise ValueError("Does not support backend '{0}'.".format(backend))
 
@@ -178,7 +196,8 @@ def extract_options(name):
     else:
         res = {}
         for opt in opts[1:]:
-            if opt in ("SkipDim1", "OneOff", "NoProb", "Dec4", "Dec3", "Dec2",
+            if opt in ("SkipDim1", "OneOff", "NoProb", "NoProbOpp",
+                       "Dec4", "Dec3", "Dec2", 'Svm',
                        'Out0', 'Reshape', 'SklCol', 'DF', 'OneOffArray'):
                 res[opt] = True
             else:
@@ -193,6 +212,7 @@ def compare_outputs(expected, output, verbose=False, **kwargs):
     """
     SkipDim1 = kwargs.pop("SkipDim1", False)
     NoProb = kwargs.pop("NoProb", False)
+    NoProbOpp = kwargs.pop("NoProbOpp", False)
     Dec4 = kwargs.pop("Dec4", False)
     Dec3 = kwargs.pop("Dec3", False)
     Dec2 = kwargs.pop("Dec2", False)
@@ -214,21 +234,25 @@ def compare_outputs(expected, output, verbose=False, **kwargs):
                 tuple([d for d in expected.shape if d > 1]))
             output = output.reshape(tuple([d for d in expected.shape
                                            if d > 1]))
-        if NoProb:
+        if NoProb or NoProbOpp:
             # One vector is (N,) with scores, negative for class 0
             # positive for class 1
             # The other vector is (N, 2) score in two columns.
             if len(output.shape) == 2 and output.shape[1] == 2 and len(
                     expected.shape) == 1:
                 output = output[:, 1]
+                if NoProbOpp:
+                    output = -output
             elif len(output.shape) == 1 and len(expected.shape) == 1:
                 pass
             elif len(expected.shape) == 1 and len(output.shape) == 2 and \
                     expected.shape[0] == output.shape[0] and \
                     output.shape[1] == 1:
                 output = output[:, 0]
+                if NoProbOpp:
+                    output = -output
             elif expected.shape != output.shape:
-                raise NotImplementedError("No good shape: {0} != {1}".format(
+                raise NotImplementedError("Shape mismatch: {0} != {1}".format(
                     expected.shape, output.shape))
         if len(expected.shape) == 1 and len(
                 output.shape) == 2 and output.shape[1] == 1:
@@ -236,7 +260,8 @@ def compare_outputs(expected, output, verbose=False, **kwargs):
         if len(output.shape) == 3 and output.shape[0] == 1 and len(
                 expected.shape) == 2:
             output = output.reshape(output.shape[1:])
-        if expected.dtype in (numpy.str, numpy.dtype("<U1")):
+        if expected.dtype in (numpy.str, numpy.dtype("<U1"),
+                              numpy.dtype("<U3")):
             try:
                 assert_array_equal(expected, output, verbose=verbose)
             except Exception as e:

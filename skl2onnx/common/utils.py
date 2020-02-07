@@ -55,7 +55,7 @@ def get_column_index(i, inputs):
     If *i* is a string, the function looks for input name with
     this name and returns (index, 0).
     If *i* is an integer, let's assume first we have two inputs
-    *I0 = FloatTensorType([1, 2])* and *I1 = FloatTensorType([1, 3])*,
+    *I0 = FloatTensorType([None, 2])* and *I1 = FloatTensorType([None, 3])*,
     in this case, here are the results:
 
     ::
@@ -75,7 +75,7 @@ def get_column_index(i, inputs):
         pos = 0
         end = (inputs[0].type.shape[1]
                if isinstance(inputs[0].type, TensorType) else 1)
-        if end in ('None', None):
+        if end is None:
             raise RuntimeError("Cannot extract a specific column {0} when "
                                "one input ('{1}') has unknown "
                                "dimension.".format(i, inputs[0]))
@@ -84,9 +84,14 @@ def get_column_index(i, inputs):
                 return (vi, i - pos)
             vi += 1
             pos = end
+            if vi >= len(inputs):
+                import pprint
+                raise RuntimeError(
+                    "Input {} (i={}, end={}) is not available in\n{}".format(
+                        vi, i, end, pprint.pformat(inputs)))
             rel_end = (inputs[vi].type.shape[1]
                        if isinstance(inputs[vi].type, TensorType) else 1)
-            if rel_end in ('None', None):
+            if rel_end is None:
                 raise RuntimeError("Cannot extract a specific column {0} when "
                                    "one input ('{1}') has unknown "
                                    "dimension.".format(i, inputs[vi]))

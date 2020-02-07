@@ -6,74 +6,96 @@
 
 # To register a converter for scikit-learn operators,
 # import associated modules here.
-from . import AdaBoost
-from . import ArrayFeatureExtractor
-from . import Binarizer
-from . import CalibratedClassifierCV
-from . import Concat
-from . import DecisionTree
-from . import FeatureHasher
-from . import FeatureSelection 
-from . import DictVectorizer
-from . import FeatureSelection
-from . import Flatten
-from . import FunctionTransformer
-from . import GradientBoosting
-from . import Imputer
-from . import KBinsDiscretiser
-from . import KMeans
-from . import KNN
-from . import LabelBinariser
-from . import LabelEncoder
-from . import LinearClassifier
-from . import LinearRegressor
+from . import ada_boost
+from . import array_feature_extractor
+from . import bagging
+from . import binariser
+from . import calibrated_classifier_cv
+from . import concat_op
+from . import cross_decomposition
+from . import decision_tree
+from . import decomposition
+from . import dict_vectoriser
+from . import feature_selection
+from . import flatten_op
+from . import function_transformer
+from . import gaussian_process
+from . import gaussian_mixture
+from . import gradient_boosting
+from . import grid_search_cv
+from . import imputer_op
+from . import k_bins_discretiser
+from . import k_means
+from . import label_binariser
+from . import label_encoder
+from . import linear_classifier
+from . import linear_regressor
 from . import multilayer_perceptron
-from . import NaiveBayes
-from . import Normalizer
-from . import OneHotEncoder
-from . import OneVsRestClassifier
-from . import PolynomialFeatures
-from . import RandomForest
-from . import Scaler
-from . import SVD
-from . import SVM
-from . import TextVectorizer
-from . import TfIdfTransformer
-from . import VotingClassifier
-from . import ZipMap
+from . import multiply_op
+from . import naive_bayes
+from . import nearest_neighbours
+from . import normaliser
+from . import one_hot_encoder
+from . import one_vs_rest_classifier
+from . import ordinal_encoder
+from . import polynomial_features
+from . import random_forest
+from . import ransac_regressor
+from . import scaler_op
+from . import sgd_classifier
+from . import stacking
+from . import support_vector_machines
+from . import text_vectoriser
+from . import tfidf_transformer
+from . import tfidf_vectoriser
+from . import voting_classifier
+from . import voting_regressor
+from . import zip_map
 
 __all__ = [
-    AdaBoost,
-    ArrayFeatureExtractor,
-    Binarizer,
-    CalibratedClassifierCV,
-    Concat,
-    DecisionTree,
-    DictVectorizer,
-    FeatureSelection,
-    Flatten,
-    FunctionTransformer,
-    GradientBoosting,
-    Imputer,
-    KBinsDiscretiser,
-    KMeans,
-    KNN,
-    LabelBinariser,
-    LabelEncoder,
-    LinearClassifier,
-    LinearRegressor,
+    ada_boost,
+    array_feature_extractor,
+    bagging,
+    binariser,
+    calibrated_classifier_cv,
+    concat_op,
+    cross_decomposition,
+    decision_tree,
+    decomposition,
+    dict_vectoriser,
+    feature_selection,
+    flatten_op,
+    function_transformer,
+    gaussian_process,
+    gaussian_mixture,
+    gradient_boosting,
+    grid_search_cv,
+    imputer_op,
+    k_bins_discretiser,
+    k_means,
+    label_binariser,
+    label_encoder,
+    linear_classifier,
+    linear_regressor,
     multilayer_perceptron,
-    NaiveBayes,
-    Normalizer,
-    OneHotEncoder,
-    OneVsRestClassifier,
-    PolynomialFeatures,
-    RandomForest,
-    Scaler,
-    SVD,
-    SVM,
-    TextVectorizer,
-    TfIdfTransformer,
-    VotingClassifier,
-    ZipMap,
+    multiply_op,
+    naive_bayes,
+    nearest_neighbours,
+    normaliser,
+    one_hot_encoder,
+    one_vs_rest_classifier,
+    ordinal_encoder,
+    polynomial_features,
+    random_forest,
+    ransac_regressor,
+    scaler_op,
+    sgd_classifier,
+    stacking,
+    support_vector_machines,
+    text_vectoriser,
+    tfidf_transformer,
+    tfidf_vectoriser,
+    voting_classifier,
+    voting_regressor,
+    zip_map,
 ]

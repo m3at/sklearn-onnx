@@ -7,7 +7,7 @@
 """
 Main entry point to the converter from the *scikit-learn* to *onnx*.
 """
-__version__ = "1.4.7"
+__version__ = "1.6.0"
 __author__ = "Microsoft"
 __producer__ = "skl2onnx"
 __producer_version__ = __version__
@@ -15,7 +15,7 @@ __domain__ = "ai.onnx"
 __model_version__ = 0
 
 
-from .convert import convert_sklearn # noqa
+from .convert import convert_sklearn, to_onnx, wrap_as_onnx_mixin # noqa
 from ._supported_operators import update_registered_converter # noqa
 from ._parse import update_registered_parser # noqa
 

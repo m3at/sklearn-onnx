@@ -13,15 +13,37 @@ jobs:
     vmImage: 'Ubuntu-16.04'
   strategy:
     matrix:
-      Py36-Onnx141:
-        python.version: '3.6'
-        numpy.version: '==1.16.2'
-        onnx.version: '==1.4.1'
+      Py37-Onnx160-Sk0221:
+        python.version: '3.7'
+        numpy.version: '==1.18.0'
+        onnx.version: '==1.6.0'
         onnxrt.version: '-i https://test.pypi.org/simple/ ort-nightly'
-        sklearn.version: '==0.20.3'
+        sklearn.version: '==0.22.1'
+      Py37-Onnx160-Sk0213:
+        python.version: '3.7'
+        numpy.version: '==1.18.0'
+        onnx.version: '==1.6.0'
+        onnxrt.version: '-i https://test.pypi.org/simple/ ort-nightly'
+        sklearn.version: '==0.21.3'
+      Py37-Onnx150:
+        python.version: '3.7'
+        numpy.version: '==1.18.0'
+        onnx.version: '==1.6.0'
+        onnxrt.version: '-i https://test.pypi.org/simple/ ort-nightly'
+        sklearn.version: '==0.21.3'
+      Py37-Onnxgit:
+        python.version: '3.7'
+        numpy.version: '==1.18.0'
+        onnx.version: 'git'
+        onnxrt.version: '-i https://test.pypi.org/simple/ ort-nightly'
+        sklearn.version: '==0.21.3'
     maxParallel: 3
 
   steps:
+  - script: |
+      sudo install -d -m 0777 /home/vsts/.conda/envs
+    displayName: Fix Conda permissions
+
   - task: CondaEnvironment@1
     inputs:
       createCustomEnvironment: true
@@ -36,7 +58,8 @@ jobs:
     displayName: 'Install environment'
 
   - script: |
-      pip install numpy$(numpy.version)
+      conda install numpy$(numpy.version)
+      pip install openpyxl
     displayName: 'install numpy'
 
   - script: |
@@ -44,7 +67,16 @@ jobs:
     displayName: 'install scikit-learn'
 
   - script: |
-      pip install onnx$(onnx.version)
+      if [ '$(onnx.version)' == 'git' ]
+        then
+          git clone https://github.com/onnx/onnx.git --recursive
+          export ONNX_ML=1
+          cd onnx
+          python setup.py install
+          cd ..
+        else
+          pip install onnx$(onnx.version)
+      fi
     displayName: 'install onnx'
 
   - script: |
@@ -53,6 +85,10 @@ jobs:
 
   - script: |
       pip install -r requirements.txt
+      git clone https://github.com/microsoft/onnxconverter-common
+      cd onnxconverter-common
+      pip install -e .
+      cd ..
       pip install -r requirements-dev.txt
       pip install pytest
     displayName: 'install requirements'
@@ -76,17 +112,11 @@ jobs:
     displayName: 'version'
 
   - script: |
-      pytest tests --basetemp=temp --doctest-modules --junitxml=junit/test-results.xml
+      pytest tests --durations=0 --basetemp=temp --doctest-modules --junitxml=junit/test-results.xml
     displayName: 'pytest'
 
   - script: |
-      pip install onnxmltools openpyxl
-      coverage run --include=skl2onnx/** tests/benchmark.py
-      coverage report -m
-      coverage html
-    displayName: 'coverage'
-
-  - script: |
+      python -m pip install openpyxl
       python tests/benchmark.py
     displayName: 'benchmark'
 

@@ -53,7 +53,7 @@ to convert other model formats into ONNX. Here we will use
     from skl2onnx import convert_sklearn
     from skl2onnx.common.data_types import FloatTensorType
 
-    initial_type = [('float_input', FloatTensorType([1, 4]))]
+    initial_type = [('float_input', FloatTensorType([None, 4]))]
     onx = convert_sklearn(clr, initial_types=initial_type)
     with open("logreg_iris.onnx", "wb") as f:
         f.write(onx.SerializeToString())
@@ -69,5 +69,6 @@ for this machine learning model.
     import onnxruntime as rt
     sess = rt.InferenceSession("logreg_iris.onnx")
     input_name = sess.get_inputs()[0].name
+    label_name = sess.get_outputs()[0].name
     
     pred_onx = sess.run([label_name], {input_name: X_test.astype(numpy.float32)})[0]

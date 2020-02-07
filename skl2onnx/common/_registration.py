@@ -11,6 +11,20 @@
 # operator specified by the key.
 _converter_pool = {}
 
+
+class RegisteredConverter:
+
+    def __init__(self, fct, options):
+        self._fct = fct
+        self._options = options
+
+    def __call__(self, *args):
+        return self._fct(*args)
+
+    def get_allowed_options(self):
+        return self._options
+
+
 # This dictionary defines the shape calculators which can be invoked in
 # the conversion framework defined in _topology.py. A key in this
 # dictionary is an operator's unique ID (e.g., string and type) while
@@ -19,7 +33,8 @@ _converter_pool = {}
 _shape_calculator_pool = {}
 
 
-def register_converter(operator_name, conversion_function, overwrite=False):
+def register_converter(operator_name, conversion_function, overwrite=False,
+                       options=None):
     """
     :param operator_name: A unique operator ID. It is usually a string
                           but you can use a type as well
@@ -29,17 +44,21 @@ def register_converter(operator_name, conversion_function, overwrite=False):
                       key (i.e., operator_name) a new value
                       (i.e., conversion_function). Set this flag to True
                       to enable overwriting.
+    :param options: supported options for this converter
+        (dictionary {name: supported values or None})
     """
     if not overwrite and operator_name in _converter_pool:
-        raise ValueError('We do not overwrite registrated converter '
+        raise ValueError('We do not overwrite registered converter '
                          'by default')
-    _converter_pool[operator_name] = conversion_function
+    _converter_pool[operator_name] = RegisteredConverter(
+        conversion_function, options)
 
 
 def get_converter(operator_name):
     if operator_name not in _converter_pool:
-        raise ValueError('Unsupported conversion for operator %s'
-                         % operator_name)
+        msg = 'Unsupported conversion for operator %s (%d registered)' % (
+            operator_name, len(_converter_pool))
+        raise ValueError(msg)
     return _converter_pool[operator_name]
 
 
@@ -63,6 +82,6 @@ def register_shape_calculator(operator_name, calculator_function,
 
 def get_shape_calculator(operator_name):
     if operator_name not in _shape_calculator_pool:
-        raise ValueError('Unsupported shape calculation for operator %s'
-                         % operator_name)
+        msg = 'Unsupported shape calculator for operator %s' % operator_name
+        raise ValueError(msg)
     return _shape_calculator_pool[operator_name]

@@ -12,7 +12,7 @@ from skl2onnx.common.data_types import FloatTensorType
 from skl2onnx import convert_sklearn, update_registered_converter
 from skl2onnx.common.shape_calculator import (
     calculate_linear_classifier_output_shapes, )
-from skl2onnx.operator_converters.LinearClassifier import (
+from skl2onnx.operator_converters.linear_classifier import (
     convert_sklearn_linear_classifier, )
 from test_utils import dump_data_and_model
 
@@ -24,7 +24,8 @@ class MyCustomClassifier(BaseEstimator, ClassifierMixin):
         BaseEstimator.__init__(self)
         ClassifierMixin.__init__(self)
         self.penalty = penalty
-        self.estimator = LogisticRegression(penalty=self.penalty)
+        self.estimator = LogisticRegression(penalty=self.penalty,
+                                            solver="liblinear")
 
     def fit(self, X, y, sample_weight=None):
         self.estimator_ = self.estimator.fit(X, y, sample_weight=sample_weight)
@@ -65,8 +66,8 @@ class TestOtherLibrariesInPipeline(unittest.TestCase):
         pipe.fit(X, y)
 
         try:
-            model_onnx = convert_sklearn(pipe, "pipeline",
-                                         [("input", FloatTensorType([1, 2]))])
+            model_onnx = convert_sklearn(
+                pipe, "pipeline", [("input", FloatTensorType([None, 2]))])
         except RuntimeError as e:
             if "No proper shape calculator found for" not in str(
                     e
@@ -77,7 +78,7 @@ class TestOtherLibrariesInPipeline(unittest.TestCase):
             model_onnx = convert_sklearn(
                 pipe,
                 "pipeline",
-                [("input", FloatTensorType([1, 2]))],
+                [("input", FloatTensorType([None, 2]))],
                 custom_conversion_functions={
                     "MyCustomClassifier": my_custom_converter
                 },
@@ -93,7 +94,7 @@ class TestOtherLibrariesInPipeline(unittest.TestCase):
         model_onnx = convert_sklearn(
             pipe,
             "pipeline",
-            [("input", FloatTensorType([1, 2]))],
+            [("input", FloatTensorType([None, 2]))],
             custom_conversion_functions={
                 MyCustomClassifier: my_custom_converter
             },
@@ -117,7 +118,7 @@ class TestOtherLibrariesInPipeline(unittest.TestCase):
         )
 
         model_onnx = convert_sklearn(pipe, "pipeline",
-                                     [("input", FloatTensorType([1, 2]))])
+                                     [("input", FloatTensorType([None, 2]))])
         self.assertTrue(model_onnx is not None)
         dump_data_and_model(
             X.astype(numpy.float32),

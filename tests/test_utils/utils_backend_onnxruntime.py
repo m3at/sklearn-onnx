@@ -4,13 +4,50 @@ Helpers to test runtimes.
 import numpy
 import pandas
 import warnings
+from skl2onnx.helpers.onnx_helper import (
+    select_model_inputs_outputs,
+    enumerate_model_node_outputs,
+    enumerate_model_initializers
+)
+from skl2onnx.algebra.type_helper import _guess_type
+
 from .utils_backend import (
     load_data_and_model,
     extract_options,
     ExpectedAssertionError,
     OnnxRuntimeAssertionError,
+    OnnxRuntimeMissingNewOnnxOperatorException,
     compare_outputs,
 )
+
+
+def _display_intermediate_steps(model_onnx, inputs):
+    import onnxruntime
+    print("[_display_intermediate_steps] BEGIN")
+    if isinstance(model_onnx, str):
+        import onnx
+        model_onnx = onnx.load(model_onnx)
+
+    for name, node in enumerate_model_initializers(model_onnx, add_node=True):
+        print("INIT: {} - {}".format(name, _guess_type(node)))
+
+    for out, node in enumerate_model_node_outputs(model_onnx, add_node=True):
+        print('-')
+        print("OUTPUT: {} from {}".format(out, node.name))
+        step = select_model_inputs_outputs(model_onnx, out)
+        try:
+            step_sess = onnxruntime.InferenceSession(step.SerializeToString())
+        except Exception as e:
+            raise RuntimeError("Unable to load ONNX model with onnxruntime. "
+                               "Last added node is:\n{}".format(node)) from e
+        for o in step_sess.get_inputs():
+            print("IN :", o)
+        for o in step_sess.get_outputs():
+            print("OUT: ", o)
+        if inputs:
+            res = step_sess.run(inputs)
+            print(res)
+    print("[_display_intermediate_steps] END")
 
 
 def compare_runtime(test,
@@ -18,7 +55,9 @@ def compare_runtime(test,
                     options=None,
                     verbose=False,
                     context=None,
-                    comparable_outputs=None):
+                    comparable_outputs=None,
+                    intermediate_steps=False,
+                    classes=None):
     """
     The function compares the expected output (computed with
     the model before being converted to ONNX) and the ONNX output
@@ -34,6 +73,9 @@ def compare_runtime(test,
     :param verbose: in case of error, the function may print
         more information on the standard output
     :param comparable_outputs: compare only these outputs
+    :param intermediate_steps: displays intermediate steps
+        in case of an error
+    :param classes: classes names (if option 'nocl' is used)
     :return: tuple (outut, lambda function to run the predictions)
 
     The function does not return anything but raises an error
@@ -75,14 +117,24 @@ def compare_runtime(test,
             raise ExpectedAssertionError(
                 "Unable to load onnx '{0}' due to\n{1}".format(onx, e))
         else:
+            if intermediate_steps:
+                _display_intermediate_steps(onx, None)
             if verbose:
                 import onnx
                 model = onnx.load(onx)
                 smodel = "\nJSON ONNX\n" + str(model)
             else:
                 smodel = ""
+            if ("NOT_IMPLEMENTED : Could not find an implementation "
+                    "for the node" in str(e)):
+                # onnxruntime does not implement a specific node yet.
+                raise OnnxRuntimeMissingNewOnnxOperatorException(
+                    "onnxruntime does not implement a new operator "
+                    "'{0}'\n{1}\nONNX\n{2}".format(
+                        onx, e, smodel))
             raise OnnxRuntimeAssertionError(
-                "Unable to load onnx '{0}'\nONNX\n{1}".format(onx, smodel))
+                "Unable to load onnx '{0}'\nONNX\n{1}\n{2}".format(
+                    onx, smodel, e))
 
     input = load["data"]
     DF = options.pop('DF', False)
@@ -190,6 +242,8 @@ def compare_runtime(test,
                 except ExpectedAssertionError as expe:
                     raise expe
                 except Exception as e:
+                    if intermediate_steps:
+                        _display_intermediate_steps(onx, {name: input})
                     raise OnnxRuntimeAssertionError(
                         "Unable to run onnx '{0}' due to {1}".format(onx, e))
                 res.append(one)
@@ -219,6 +273,8 @@ def compare_runtime(test,
                 except ExpectedAssertionError as expe:
                     raise expe
                 except Exception as e:
+                    if intermediate_steps:
+                        _display_intermediate_steps(onx, iii)
                     if verbose:
                         import onnx
                         model = onnx.load(onx)
@@ -247,7 +303,10 @@ def compare_runtime(test,
                 type(input), len(inputs), list(sorted(inputs))))
         if verbose:
             run_options = onnxruntime.RunOptions()
-            run_options.run_log_verbosity_level = 5
+            if hasattr(run_options, 'run_log_verbosity_level'):
+                run_options.run_log_verbosity_level = 5
+            else:
+                run_options.log_verbosity_level = 5
         else:
             run_options = None
         try:
@@ -259,6 +318,8 @@ def compare_runtime(test,
         except ExpectedAssertionError as expe:
             raise expe
         except RuntimeError as e:
+            if intermediate_steps:
+                _display_intermediate_steps(onx, inputs, run_options)
             if "-Fail" in onx:
                 raise ExpectedAssertionError(
                     "onnxruntime cannot compute the prediction for '{0}'".
@@ -296,6 +357,7 @@ def compare_runtime(test,
                           onx,
                           decimal=decimal,
                           verbose=verbose,
+                          classes=classes,
                           **options)
     except ExpectedAssertionError as expe:
         raise expe
@@ -380,6 +442,7 @@ def _compare_expected(expected,
                       onnx,
                       decimal=5,
                       verbose=False,
+                      classes=None,
                       **kwargs):
     """
     Compares the expected output against the runtime outputs.
@@ -409,6 +472,7 @@ def _compare_expected(expected,
                                   onnx,
                                   decimal=5,
                                   verbose=verbose,
+                                  classes=classes,
                                   **kwargs)
                 tested += 1
         else:
@@ -454,6 +518,13 @@ def _compare_expected(expected,
             raise OnnxRuntimeAssertionError(
                 "output must be an array for onnx '{0}' not {1}".format(
                     onnx, type(output)))
+        if (classes is not None and (
+                expected.dtype == numpy.str or expected.dtype.char == 'U')):
+            try:
+                output = numpy.array([classes[cl] for cl in output])
+            except IndexError as e:
+                raise RuntimeError('Unable to handle\n{}\n{}\n{}'.format(
+                    expected, output, classes)) from e
         msg = compare_outputs(expected,
                               output,
                               decimal=decimal,
